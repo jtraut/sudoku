@@ -19,7 +19,16 @@ class _C:
 
 
 def _supports_ansi() -> bool:
-    return os.name != "nt" or "ANSICON" in os.environ or "WT_SESSION" in os.environ
+    if os.name != "nt":
+        return True
+    # Windows Terminal, ConEmu/ANSICON, or any mintty/xterm-compatible shell
+    return (
+        "WT_SESSION" in os.environ
+        or "ANSICON" in os.environ
+        or "MSYSTEM" in os.environ          # Git Bash / MSYS2
+        or os.environ.get("TERM", "").startswith("xterm")
+        or os.environ.get("TERM_PROGRAM", "") == "mintty"
+    )
 
 
 USE_COLOR = _supports_ansi()
@@ -33,7 +42,12 @@ def _c(code: str, text: str) -> str:
 
 class Display:
     def clear(self) -> None:
-        os.system("cls" if os.name == "nt" else "clear")
+        # ANSI clear works in mintty and Windows Terminal.
+        # os.system("cls") clears the hidden ConHost buffer, not mintty's screen.
+        if USE_COLOR:
+            print("\033[2J\033[H", end="", flush=True)
+        else:
+            os.system("cls" if os.name == "nt" else "clear")
 
     def render_board(
         self,

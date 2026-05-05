@@ -14,38 +14,77 @@ class Action:
     dc: int = 0
 
 
+def _has_windows_console() -> bool:
+    """Return True only when stdin is a real Windows console (not mintty/pipe)."""
+    try:
+        import ctypes
+        mode = ctypes.c_ulong()
+        # GetStdHandle(-10) = STD_INPUT_HANDLE; GetConsoleMode fails on pipes
+        return bool(
+            ctypes.windll.kernel32.GetConsoleMode(
+                ctypes.windll.kernel32.GetStdHandle(-10), ctypes.byref(mode)
+            )
+        )
+    except Exception:
+        return False
+
+
 class InputReader:
-    """Platform-aware single-keypress reader."""
+    """Platform-aware single-keypress reader.
 
-    if os.name == "nt":
-        import msvcrt as _msvcrt
+    Three modes detected at runtime:
+      msvcrt  — real Windows console (CMD, Windows Terminal)
+      termios — POSIX terminal (Linux, macOS)
+      line    — mintty / pipe fallback: reads a full line, uses first character
+    """
 
-        def read_key(self) -> str:
-            import msvcrt
-            ch = msvcrt.getwch()
-            if ch in ("\x00", "\xe0"):  # special / arrow prefix on Windows
-                ch2 = msvcrt.getwch()
-                return f"\x00{ch2}"
+    def __init__(self):
+        if os.name == "nt":
+            self.line_mode = not _has_windows_console()
+        else:
+            self.line_mode = False
+
+    def read_key(self) -> str:
+        if self.line_mode:
+            return self._read_line()
+        if os.name == "nt":
+            return self._read_msvcrt()
+        return self._read_posix()
+
+    def _read_msvcrt(self) -> str:
+        import msvcrt
+        ch = msvcrt.getwch()
+        if ch in ("\x00", "\xe0"):
+            return f"\x00{msvcrt.getwch()}"
+        return ch
+
+    def _read_posix(self) -> str:
+        import tty, termios
+        fd = sys.stdin.fileno()
+        old = termios.tcgetattr(fd)
+        try:
+            tty.setraw(fd)
+            ch = sys.stdin.read(1)
+            if ch == "\x1b":
+                ch2 = sys.stdin.read(1)
+                if ch2 == "[":
+                    ch3 = sys.stdin.read(1)
+                    return f"\x1b[{ch3}"
             return ch
-    else:
-        import tty as _tty
-        import termios as _termios
+        finally:
+            termios.tcsetattr(fd, termios.TCSADRAIN, old)
 
-        def read_key(self) -> str:
-            import tty, termios
-            fd = sys.stdin.fileno()
-            old = termios.tcgetattr(fd)
-            try:
-                tty.setraw(fd)
-                ch = sys.stdin.read(1)
-                if ch == "\x1b":
-                    ch2 = sys.stdin.read(1)
-                    if ch2 == "[":
-                        ch3 = sys.stdin.read(1)
-                        return f"\x1b[{ch3}"
-                return ch
-            finally:
-                termios.tcsetattr(fd, termios.TCSADRAIN, old)
+    def _read_line(self) -> str:
+        """Fallback for mintty/GitBash: read a full line, return first character.
+
+        Uses input() rather than sys.stdin.readline() so that Ctrl+C raises
+        KeyboardInterrupt even while the call is blocking in the C layer.
+        """
+        try:
+            line = input("  > ").strip()
+            return line[0] if line else ""
+        except (EOFError, KeyboardInterrupt):
+            return "q"
 
 
 class Player:

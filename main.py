@@ -1,6 +1,10 @@
 #!/usr/bin/env python3
 import sys
 import argparse
+
+# Windows terminals default to cp1252; force UTF-8 for box-drawing characters.
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8")
 from generator import Difficulty
 from game import Game
 

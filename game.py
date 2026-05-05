@@ -24,8 +24,6 @@ class Game:
         self._status_kind: str = "info"
 
     def run(self) -> None:
-        self._display.clear()
-        self._display.print_banner()
         self._new_game()
 
         while True:
@@ -39,8 +37,11 @@ class Game:
         print("  Thanks for playing!")
 
     def _new_game(self) -> None:
-        self._set_status(f"Generating {self._difficulty.value} puzzle…", "info")
-        self._render()
+        # Show a single generating screen without a full board render so there
+        # is no empty-board frame left in the terminal scrollback.
+        self._display.clear()
+        self._display.print_banner()
+        print(f"\n  Generating {self._difficulty.value} puzzle…", flush=True)
         self._board = self._generator.generate(self._difficulty)
         self._result = None
         self._player.row = 0
@@ -133,7 +134,10 @@ class Game:
         if self._show_help:
             self._display.print_help()
         else:
-            print("  Press ? for help")
+            if self._player._reader.line_mode:
+                print("  Press ? for help  (line mode: Enter after each key)")
+            else:
+                print("  Press ? for help")
         print()
 
     def _set_status(self, message: str, kind: str = "info") -> None:
