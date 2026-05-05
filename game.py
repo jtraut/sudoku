@@ -113,13 +113,24 @@ class Game:
             return
 
         if action.kind == "new":
-            self._new_game()
+            self._set_status("Start a new game? Press Y to confirm or any other key to cancel.", "warn")
+            self._render()
+            if self._player._reader.read_key().lower() == "y":
+                self._new_game()
+            else:
+                self._set_status("New game cancelled.", "info")
             return
 
         if action.kind == "difficulty":
-            idx = _DIFFICULTIES.index(self._difficulty)
-            self._difficulty = _DIFFICULTIES[(idx + 1) % len(_DIFFICULTIES)]
-            self._new_game()
+            next_idx = (_DIFFICULTIES.index(self._difficulty) + 1) % len(_DIFFICULTIES)
+            next_diff = _DIFFICULTIES[next_idx]
+            self._set_status(f"Switch to {next_diff.value} and start a new game? Press Y to confirm or any other key to cancel.", "warn")
+            self._render()
+            if self._player._reader.read_key().lower() == "y":
+                self._difficulty = next_diff
+                self._new_game()
+            else:
+                self._set_status("Difficulty change cancelled.", "info")
             return
 
         if action.kind == "help":
