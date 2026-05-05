@@ -12,10 +12,10 @@ python main.py -d easy      # easy | medium | hard | expert
 
 | Key(s)                         | Action                              |
 |--------------------------------|-------------------------------------|
-| Arrow keys / `W` `A` `D` / `H` `J` `K` `L` | Move cursor                |
+| Arrow keys / `W` `A` `S` `D` / `H` `J` `K` `L` | Move cursor            |
 | `1` – `9`                      | Place a digit                       |
 | `0` / `Space` / `X` / `Delete` | Clear a cell                        |
-| `S`                            | Auto-solve the board                |
+| `Tab`                          | Auto-solve (asks for confirmation)  |
 | `N`                            | New game (same difficulty)          |
 | `F`                            | Cycle difficulty and start new game |
 | `C`                            | Check board for conflicts           |

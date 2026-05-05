@@ -55,7 +55,8 @@ class InputReader:
         import msvcrt
         ch = msvcrt.getwch()
         if ch in ("\x00", "\xe0"):
-            return f"\x00{msvcrt.getwch()}"
+            # Preserve the actual prefix so _parse() can match \xe0 arrow sequences
+            return ch + msvcrt.getwch()
         return ch
 
     def _read_posix(self) -> str:
@@ -106,45 +107,42 @@ class Player:
         return self._parse(key)
 
     def _parse(self, key: str) -> Action:
+        # --- Arrow / special sequences must be checked BEFORE lowercasing ---
+        # CMD sends \xe0 prefix for arrows; POSIX sends \x1b[ escape sequences.
+        # Both \x00 and \xe0 are treated as extended-key prefixes on Windows.
+        if key in ("\x00H", "\x00\x48", "\xe0H", "\xe0\x48"):
+            return Action("move", dr=-1, dc=0)
+        if key in ("\x00P", "\x00\x50", "\xe0P", "\xe0\x50"):
+            return Action("move", dr=1,  dc=0)
+        if key in ("\x00K", "\x00\x4b", "\xe0K", "\xe0\x4b"):
+            return Action("move", dr=0,  dc=-1)
+        if key in ("\x00M", "\x00\x4d", "\xe0M", "\xe0\x4d"):
+            return Action("move", dr=0,  dc=1)
+
+        if key == "\x1b[A":  return Action("move", dr=-1, dc=0)
+        if key == "\x1b[B":  return Action("move", dr=1,  dc=0)
+        if key == "\x1b[D":  return Action("move", dr=0,  dc=-1)
+        if key == "\x1b[C":  return Action("move", dr=0,  dc=1)
+
+        # Tab → auto-solve (confirmation handled by Game)
+        if key == "\t":  return Action("solve")
+
         k = key.lower()
 
-        # Quit
-        if k in ("q", "\x03"):
-            return Action("quit")
+        if k in ("q", "\x03"):  return Action("quit")
 
-        # Arrow keys — Windows
-        if k == "\x00H" or k == "\x00\x48":  return Action("move", dr=-1, dc=0)
-        if k == "\x00P" or k == "\x00\x50":  return Action("move", dr=1, dc=0)
-        if k == "\x00K" or k == "\x00\x4b":  return Action("move", dr=0, dc=-1)
-        if k == "\x00M" or k == "\x00\x4d":  return Action("move", dr=0, dc=1)
-
-        # Arrow keys — ANSI escape
-        if key == "\x1b[A":  return Action("move", dr=-1, dc=0)
-        if key == "\x1b[B":  return Action("move", dr=1, dc=0)
-        if key == "\x1b[D":  return Action("move", dr=0, dc=-1)
-        if key == "\x1b[C":  return Action("move", dr=0, dc=1)
-
-        # HJKL / WASD movement (d = right, w = up, a = left)
-        # 's' is reserved for solve, so vertical WASD uses w only
-        hjkl_map = {"k": (-1, 0), "h": (0, -1), "j": (1, 0), "l": (0, 1)}
-        if k in hjkl_map:
-            dr, dc = hjkl_map[k]
+        # Full WASD + HJKL movement
+        _MOVE = {
+            "w": (-1, 0), "a": (0, -1), "s": (1, 0), "d": (0, 1),
+            "k": (-1, 0), "h": (0, -1), "j": (1, 0), "l": (0, 1),
+        }
+        if k in _MOVE:
+            dr, dc = _MOVE[k]
             return Action("move", dr=dr, dc=dc)
 
-        if k == "w":  return Action("move", dr=-1, dc=0)
-        if k == "a":  return Action("move", dr=0, dc=-1)
-        if k == "d":  return Action("move", dr=0, dc=1)
+        if k in "123456789":  return Action("place", value=int(k))
+        if k in ("0", " ", "x", "\x7f", "\x08"):  return Action("clear")
 
-        # Digits 1-9 → place
-        if k in "123456789":
-            return Action("place", value=int(k))
-
-        # Clear cell
-        if k in ("0", " ", "x", "\x7f", "\x08"):
-            return Action("clear")
-
-        # Commands
-        if k == "s":   return Action("solve")
         if k == "n":   return Action("new")
         if k == "c":   return Action("check")
         if k == "f":   return Action("difficulty")

@@ -18,17 +18,34 @@ class _C:
     BG_DARK = "\033[100m"
 
 
+def _enable_windows_ansi() -> bool:
+    """Enable VT/ANSI processing on the Windows console stdout handle."""
+    try:
+        import ctypes
+        k32 = ctypes.windll.kernel32
+        handle = k32.GetStdHandle(-11)          # STD_OUTPUT_HANDLE
+        mode = ctypes.c_ulong()
+        if not k32.GetConsoleMode(handle, ctypes.byref(mode)):
+            return False
+        return bool(k32.SetConsoleMode(handle, mode.value | 0x0004))  # ENABLE_VT_PROCESSING
+    except Exception:
+        return False
+
+
 def _supports_ansi() -> bool:
     if os.name != "nt":
         return True
-    # Windows Terminal, ConEmu/ANSICON, or any mintty/xterm-compatible shell
-    return (
+    # Already-known ANSI environments
+    if (
         "WT_SESSION" in os.environ
         or "ANSICON" in os.environ
-        or "MSYSTEM" in os.environ          # Git Bash / MSYS2
+        or "MSYSTEM" in os.environ
         or os.environ.get("TERM", "").startswith("xterm")
         or os.environ.get("TERM_PROGRAM", "") == "mintty"
-    )
+    ):
+        return True
+    # Regular CMD / PowerShell on Windows 10+: try to enable VT processing
+    return _enable_windows_ansi()
 
 
 USE_COLOR = _supports_ansi()
@@ -120,9 +137,15 @@ class Display:
             cell_str = str(val) if val != EMPTY else "·"
 
             if is_cursor:
-                cell_str = _c(_C.BG_BLUE + _C.BOLD + _C.WHITE, f" {cell_str} ")
+                if USE_COLOR:
+                    cell_str = _c(_C.BG_BLUE + _C.BOLD + _C.WHITE, f" {cell_str} ")
+                else:
+                    cell_str = f"[{cell_str}]"   # ASCII cursor indicator
             elif is_conflict:
-                cell_str = _c(_C.RED + _C.BOLD, f" {cell_str} ")
+                if USE_COLOR:
+                    cell_str = _c(_C.RED + _C.BOLD, f" {cell_str} ")
+                else:
+                    cell_str = f"!{cell_str}!"   # ASCII conflict indicator
             elif is_given:
                 cell_str = _c(_C.BOLD + _C.WHITE, f" {cell_str} ")
             elif val != EMPTY:
@@ -149,10 +172,10 @@ class Display:
         print(_c(_C.BOLD, "  Controls"))
         print("  ─────────────────────────────────")
         rows = [
-            ("Arrow keys / WAD / HJKL", "Move cursor"),
+            ("Arrow keys / WASD / HJKL", "Move cursor"),
             ("1-9", "Place digit"),
             ("0 / Space / Delete / X", "Clear cell"),
-            ("S", "Auto-solve board"),
+            ("Tab", "Auto-solve (asks for confirmation)"),
             ("N", "New game"),
             ("F", "Cycle difficulty then new game"),
             ("C", "Check board for conflicts"),

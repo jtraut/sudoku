@@ -95,6 +95,12 @@ class Game:
             return
 
         if action.kind == "solve":
+            self._set_status("Auto-solve? Press Y to confirm or any other key to cancel.", "warn")
+            self._render()
+            confirm = self._player._reader.read_key()
+            if confirm.lower() != "y":
+                self._set_status("Auto-solve cancelled.", "info")
+                return
             self._set_status("Solving…", "info")
             self._render()
             solution = self._solver.solve_copy(self._board)
