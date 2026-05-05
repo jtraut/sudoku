@@ -131,10 +131,9 @@ class Player:
 
         if k in ("q", "\x03"):  return Action("quit")
 
-        # Full WASD + HJKL movement
+        # WASD movement
         _MOVE = {
             "w": (-1, 0), "a": (0, -1), "s": (1, 0), "d": (0, 1),
-            "k": (-1, 0), "h": (0, -1), "j": (1, 0), "l": (0, 1),
         }
         if k in _MOVE:
             dr, dc = _MOVE[k]

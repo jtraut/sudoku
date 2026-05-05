@@ -12,7 +12,7 @@ python main.py -d easy      # easy | medium | hard | expert
 
 | Key(s)                         | Action                              |
 |--------------------------------|-------------------------------------|
-| Arrow keys / `W` `A` `S` `D` / `H` `J` `K` `L` | Move cursor            |
+| Arrow keys / `W` `A` `S` `D` | Move cursor                        |
 | `1` – `9`                      | Place a digit                       |
 | `0` / `Space` / `X` / `Delete` | Clear a cell                        |
 | `Tab`                          | Auto-solve (asks for confirmation)  |

@@ -172,7 +172,7 @@ class Display:
         print(_c(_C.BOLD, "  Controls"))
         print("  ─────────────────────────────────")
         rows = [
-            ("Arrow keys / WASD / HJKL", "Move cursor"),
+            ("Arrow keys / WASD", "Move cursor"),
             ("1-9", "Place digit"),
             ("0 / Space / Delete / X", "Clear cell"),
             ("Tab", "Auto-solve (asks for confirmation)"),
