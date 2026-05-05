@@ -1,2 +1,2 @@
 # sudoku
-Python implementation of terminal-based Sudoku.
+Python implementation of terminal-based Sudoku; leveraging Claude Code.
