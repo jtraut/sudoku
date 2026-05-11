@@ -38,18 +38,26 @@ def _supports_ansi() -> bool:
     # Non-Windows terminals support ANSI by default, nothing to do
     if os.name != "nt":
         return True
-    # Check for known ANSI-capable Windows environments before making the
-    # slower SetConsoleMode syscall
-    if (
+    # Always try to enable VT processing first on Windows — this is required even
+    # in winpty-wrapped processes. winpty gives Python a real ConHost handle, but
+    # ENABLE_VIRTUAL_TERMINAL_PROCESSING isn't on by default. Without it, ConHost
+    # renders ESC (0x1B) as a visible '←' character that winpty then passes through
+    # to mintty literally instead of as a control code. Checking env vars first and
+    # skipping this syscall was the bug — MSYSTEM / WT_SESSION just mean "you're in
+    # an ANSI-capable shell", they don't actually enable processing on the handle.
+    if _enable_windows_ansi():
+        return True
+    # _enable_windows_ansi failed — means stdout is a pipe or redirect with no real
+    # console handle (plain Git Bash without winpty, redirected output, etc.).
+    # Fall back to env-var heuristics: ANSI bytes will travel through the pipe directly
+    # to mintty which can interpret them natively, so USE_COLOR=True is still correct.
+    return (
         "WT_SESSION" in os.environ       # Windows Terminal
         or "ANSICON" in os.environ       # ANSICON wrapper
         or "MSYSTEM" in os.environ       # Git Bash / MSYS2
         or os.environ.get("TERM", "").startswith("xterm")
         or os.environ.get("TERM_PROGRAM", "") == "mintty"
-    ):
-        return True
-    # Plain CMD or PowerShell on Windows 10+ — try to enable VT processing
-    return _enable_windows_ansi()
+    )
 
 
 # Evaluated once at import time — no need to re-check on every render
