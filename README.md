@@ -8,6 +8,19 @@ python main.py              # medium difficulty
 python main.py -d easy      # easy | medium | hard | expert
 ```
 
+### Git Bash (mintty)
+
+Native Windows Python cannot receive single keypresses or Ctrl+C signals through
+mintty's pipe without a console wrapper. Use `winpty`, which ships with Git for
+Windows — no extra install needed:
+
+```
+winpty python main.py
+```
+
+Running without `winpty` still works but degrades to line-input mode (type a key
+then press Enter) and Ctrl+C will not stop the process.
+
 ## Controls
 
 | Key(s)                         | Action                              |
