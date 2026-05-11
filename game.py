@@ -18,10 +18,14 @@ class Game:
         self._player = Player()
         self._difficulty = Difficulty.MEDIUM
         self._board: Board = Board()
-        self._result: VerificationResult | None = None
+        self._result: VerificationResult | None = None  # last check result, or None if stale
         self._show_help: bool = False
         self._status: str = ""
         self._status_kind: str = "info"
+        # TODO: add a timer here — start on _new_game(), stop on solved, store elapsed seconds
+        # TODO: add a scoreboard dict keyed by Difficulty that tracks wins and best times.
+        #       could persist to a small JSON file in the user's home dir so it survives sessions.
+        #       something like: {"easy": {"wins": 3, "best": 142}, "medium": {...}, ...}
 
     def run(self) -> None:
         self._new_game()
@@ -35,6 +39,7 @@ class Game:
 
         self._display.clear()
         print("  Thanks for playing!")
+        # TODO: print a goodbye summary here — total wins this session, best times per difficulty
 
     def _new_game(self) -> None:
         # Show a single generating screen without a full board render so there
@@ -49,6 +54,7 @@ class Game:
         self._set_status(
             f"New {self._difficulty.value} game. Press ? for help.", "info"
         )
+        # TODO: reset and start the timer here
 
     def _handle(self, action: Action) -> None:
         if action.kind == "quit":
@@ -56,6 +62,7 @@ class Game:
 
         if action.kind == "move":
             self._player.move(action.dr, action.dc)
+            # Clear the status message so old check results don't persist after moving
             self._set_status("")
             return
 
@@ -65,12 +72,18 @@ class Game:
             if not ok:
                 self._set_status("Cannot edit a given cell.", "warn")
             else:
-                self._result = None  # Invalidate last check
+                # Invalidate the last check result — it refers to the old board state.
+                # We don't want red highlights from a previous check lingering after a fix.
+                self._result = None
                 self._set_status("")
+                # Auto-check every placement so the player gets instant feedback on a solve.
+                # We only surface the result if the board is actually finished though —
+                # popping conflict warnings on every keystroke would be really annoying.
                 result = Verifier.check(self._board)
                 if result.solved:
                     self._result = result
                     self._set_status("Congratulations! Puzzle solved!", "success")
+                    # TODO: stop the timer, record win + elapsed time to the scoreboard here
             return
 
         if action.kind == "clear":
@@ -79,7 +92,7 @@ class Game:
             if not ok:
                 self._set_status("Cannot edit a given cell.", "warn")
             else:
-                self._result = None
+                self._result = None  # same as place — stale check results need to go
                 self._set_status("")
             return
 
@@ -87,6 +100,7 @@ class Game:
             self._result = Verifier.check(self._board)
             if self._result.solved:
                 self._set_status("Puzzle solved correctly!", "success")
+                # TODO: record win here too in case they somehow reached solved without placing last
             elif not self._result.valid:
                 n = len(self._result.conflicts)
                 self._set_status(f"{n} conflict(s) found — highlighted in red.", "error")
@@ -95,6 +109,7 @@ class Game:
             return
 
         if action.kind == "solve":
+            # Two-step confirmation — render after setting status so the player sees the prompt
             self._set_status("Auto-solve? Press Y to confirm or any other key to cancel.", "warn")
             self._render()
             confirm = self._player._reader.read_key()
@@ -105,11 +120,14 @@ class Game:
             self._render()
             solution = self._solver.solve_copy(self._board)
             if solution is None:
+                # This only happens if the player has placed digits that make the board
+                # unsolvable — the generator always produces a valid unique puzzle to start
                 self._set_status("No solution exists for this board.", "error")
             else:
                 self._board = solution
                 self._result = Verifier.check(self._board)
                 self._set_status("Board auto-solved.", "success")
+                # Intentionally not recording a win here — auto-solve doesn't count!
             return
 
         if action.kind == "new":
@@ -122,6 +140,7 @@ class Game:
             return
 
         if action.kind == "difficulty":
+            # Cycles through the difficulty enum in order and wraps back around
             next_idx = (_DIFFICULTIES.index(self._difficulty) + 1) % len(_DIFFICULTIES)
             next_diff = _DIFFICULTIES[next_idx]
             self._set_status(f"Switch to {next_diff.value} and start a new game? Press Y to confirm or any other key to cancel.", "warn")
@@ -134,13 +153,22 @@ class Game:
             return
 
         if action.kind == "help":
+            # Toggle — same key shows and hides the help panel
             self._show_help = not self._show_help
             return
+
+        # TODO: add "hint" action — reveal one correct cell chosen from the solution.
+        #       would need to solve_copy the current board state and pick a random empty cell.
+        #       probably map to H and track how many hints were used per game.
+
+        # TODO: add "undo" action — keep a stack of (row, col, old_value) tuples and pop on U.
+        #       only player-entered cells can be undone — givens are immutable so no-ops there.
 
     def _render(self) -> None:
         self._display.clear()
         self._display.print_banner()
         print(f"  Difficulty: {self._difficulty.value.capitalize()}")
+        # TODO: print elapsed time here once the timer is implemented, e.g. "  Time: 2:34"
         self._display.render_board(
             self._board,
             result=self._result,
@@ -151,6 +179,7 @@ class Game:
         if self._show_help:
             self._display.print_help()
         else:
+            # Remind line-mode players that they need to press Enter — easy to forget
             if self._player._reader.line_mode:
                 print("  Press ? for help  (line mode: Enter after each key)")
             else:
